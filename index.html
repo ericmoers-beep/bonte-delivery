@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#1A1612">
+  <title>Bonté Delivery</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { margin: 0; padding: 0; background: #1A1612; overflow-x: hidden; line-height: 1.5; }
+    input, select, textarea, button { font-family: 'DM Sans', sans-serif; }
+    select { -webkit-appearance: none; appearance: auto; }
+    h1, h2, h3 { line-height: 1.3; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js');
+    }
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, useRef } = React;
+
+// ─── MASTER STOP DATA ───
+const MASTER_STOPS = {
+  hmc: {
+    id: "hmc", name: "Hunger Mountain Coop", shortName: "HMC",
+    address: "623 Stone Cutters Way, Montpelier",
+    contact: "Kendra, kendram@hungermountaincoop.com, 802-223-8000",
+    hours: "M-Sat 6-2",
+    notes: "Park in delivery lot (left of front entrance). Bring bread into receiving door up ramp, sign in on computer, get checked in by receiver.",
+    checkPizza: true,
+    routeNotes: {
+      "route-1": "Take any bread still on shelf as credits/returns",
+      "route-2": "DO NOT take bread still on shelf as credits/returns"
+    },
+    defaultProducts: [
+      { name: "Sourdough", rate: 12.00, qty: 0 },
+      { name: "Buckwheat Sourdough", rate: 12.00, qty: 0 },
+      { name: "Buckwheat Boule", rate: 10.00, qty: 0 },
+      { name: "Olive Rosemary Boule", rate: 12.50, qty: 0 },
+      { name: "Country Loaf", rate: 14.00, qty: 0 },
+      { name: "Harvest Boule", rate: 13.00, qty: 0 },
+      { name: "Sourdough Pizza Crust", rate: 12.00, qty: 0 },
+    ]
+  },
+  roots: {
+    id: "roots", name: "Roots Market", shortName: "Roots",
+    address: "903 US Rt 2, Middlesex",
+    contact: "Syd no longer works here — update contact. 802-613-3586, syd@therootsfarmmarket.com",
+    hours: "M-Sat 9-6",
+    notes: "No check in, just stock and give invoice. Check and write down pizza crust numbers.",
+    checkPizza: true, defaultProducts: []
+  },
+  leo: {
+    id: "leo", name: "Leo & Co", shortName: "Leo",
+    address: "21 Essex Way, Essex JCT (Essex Experience mall)",
+    contact: "Kayla, 718-594-0415",
+    hours: "",
+    notes: "Richmond exit, 117 to 289. Back door should be unlocked, code 23790.",
+    checkPizza: false, defaultProducts: []
+  },
+  jericho: {
+    id: "jericho", name: "Jericho Market", shortName: "Jericho",
+    address: "364 VT-15, Jericho, VT 05465",
+    contact: "Evan",
+    hours: "",
+    notes: "Around back of store, employee parking. Door will be open. Check pizza.",
+    checkPizza: true, defaultProducts: []
+  },
+  stonesThrow: {
+    id: "stonesThrow", name: "Stone's Throw Pizza", shortName: "Stone's Throw",
+    address: "38 VT-15, Jericho, VT 05465",
+    contact: "Lilith, 802-393-1369",
+    hours: "",
+    notes: "Side door near dumpsters. Key code 1418 if no one there.",
+    checkPizza: false, defaultProducts: []
+  },
+  healthyWilliston: {
+    id: "healthyWilliston", name: "Healthy Living, Williston", shortName: "HL Williston",
+    address: "129 Market St, Williston",
+    contact: "Sammy, sammyc@healthylivingmarket.com, 802-879-2020",
+    hours: "",
+    notes: "Receiving around left side. Checked in by receiver. Stock on table/basket display left of deli area. Check pizza crust numbers.",
+    checkPizza: true, defaultProducts: []
+  },
+  commodities: {
+    id: "commodities", name: "Commodities", shortName: "Commodities",
+    address: "1650 Mountain Rd, Stowe",
+    contact: "Craig, commoditiesvt@gmail.com, 802-253-4464",
+    hours: "",
+    notes: "Front door. Check Pizza Crust.",
+    checkPizza: true, defaultProducts: []
+  },
+  morrisville: {
+    id: "morrisville", name: "Morrisville Food COOP", shortName: "Morrisville",
+    address: "46 Pleasant St, Morrisville, VT 05661",
+    contact: "Deb, deb@morrisvillecoop.com, 802-888-2255",
+    hours: "",
+    notes: "Check Pizza Crust.",
+    checkPizza: true, defaultProducts: []
+  },
+  buffaloMtn: {
+    id: "buffaloMtn", name: "Buffalo Mountain Coop", shortName: "Buffalo Mtn",
+    address: "75 Mill St, Hardwick",
+    contact: "Jessie, 802-323-4619, jessie@buffalomountaincoop.org",
+    hours: "M-Sat 8-6",
+    notes: "Front door, no check in, just stock. Leave invoice in bin (all the way to right side of store, exit hallway). Check Pizza Crust.",
+    checkPizza: true, defaultProducts: []
+  },
+  upperValley: {
+    id: "upperValley", name: "Upper Valley Food Coop", shortName: "Upper Valley",
+    address: "193 N Main St, WRJ",
+    contact: "Barb, barb@uppervalleyfood.coop, 802-295-5804",
+    hours: "Mon-Sat 8am-7pm, Sun 11-5",
+    notes: "Drive around right side. Check in — they stock themselves & price the bread. Get credits, write on their invoice. Ask for Pizza Count.",
+    checkPizza: true, defaultProducts: []
+  },
+  woodstock: {
+    id: "woodstock", name: "Woodstock Farmers Market", shortName: "Woodstock",
+    address: "979 Woodstock Rd, Woodstock",
+    contact: "Elle, Elle.c@woodstockfarmersmarket.com, 802-241-2400",
+    hours: "Tues-Sun 7:45am-4pm",
+    notes: "Park by receiving door on right. Find someone in black apron to check in. Doorways too narrow — small crates only. Mark credits on both invoice copies. Stock bread.",
+    checkPizza: false, defaultProducts: []
+  },
+  twinFarms: {
+    id: "twinFarms", name: "Twin Farms Resort", shortName: "Twin Farms",
+    address: "452 Royalton Turnpike, Barnard, VT 05031",
+    contact: "Sylvain (Sous Chef), 802-234-5972; Katie Olson, katieo@twinfarms.com",
+    hours: "",
+    notes: "Two gates — first on right at crest = guest gate, second at base = service gate. Buzz in, left turn after gate, follow right to loading dock. Stairs or elevator down to kitchen.",
+    checkPizza: false, defaultProducts: []
+  },
+  mehurons: {
+    id: "mehurons", name: "Mehurons", shortName: "Mehurons",
+    address: "Village Square Shopping Center, Waitsfield",
+    contact: "Bruce, bruce@mehurons.com, 802-496-3700",
+    hours: "M-Sat 8-8",
+    notes: "Back of building to main load in. Check Pizza Crust.",
+    checkPizza: true, defaultProducts: []
+  },
+  cork: {
+    id: "cork", name: "Cork", shortName: "Cork",
+    address: "512 Moscow Rd, Stowe (Moscow) — also 70 Pond St, Stowe (Stowe Village) — confirm which",
+    contact: "802-760-6374",
+    hours: "",
+    notes: "Two addresses on file — confirm correct location.",
+    checkPizza: false, defaultProducts: []
+  },
+  lebanon: {
+    id: "lebanon", name: "Lebanon Coop", shortName: "Lebanon",
+    address: "12 Centerra Parkway, Lebanon, NH",
+    contact: "Kevin, kbirdsey@coopfoodstore.com, 802-765-2883",
+    hours: "M-F 5am-3pm, Sat 5am-12pm",
+    notes: "Receiving around back from left side. Get checked in, stock shelves. Write credits on invoice, check in with receiving for credit memo — make sure they match. Check pizza crust numbers.",
+    checkPizza: true, defaultProducts: []
+  },
+  hanover: {
+    id: "hanover", name: "Hanover Coop", shortName: "Hanover",
+    address: "45 South Park St, Hanover, NH",
+    contact: "Kevin, KBirdsey@coopfoodstore.com, 802-765-2884",
+    hours: "M-F 5am-3pm, Sat 5am-12pm",
+    notes: "Drive around back from right side. Get checked in, stock shelves. Write credits on invoice, check in with receiving for credit memo — make sure they match. Check pizza crust numbers.",
+    checkPizza: true, defaultProducts: []
+  },
+  umplebys: {
+    id: "umplebys", name: "Umpleby's Bakery Cafe", shortName: "Umpleby's",
+    address: "3 South St, Hanover, NH 03755",
+    contact: "Carolyn, (603) 643-3030",
+    hours: "",
+    notes: "Park out back, use rear entrance.",
+    checkPizza: false, defaultProducts: []
+  },
+  healthySBurl: {
+    id: "healthySBurl", name: "Healthy Living, S Burlington", shortName: "HL S Burl",
+    address: "222 Dorset St, South Burlington",
+    contact: "Morgan, morgant@healthylivingmarket.com, 802-863-2569",
+    hours: "",
+    notes: "Receiving around left side. Checked in by receiver. Stock on shelf right of registers near entrance. Check pizza crust numbers.",
+    checkPizza: true, defaultProducts: []
+  },
+  cityMarketDT: {
+    id: "cityMarketDT", name: "City Market, Downtown", shortName: "City Mkt DT",
+    address: "82 South Winooski Ave, Burlington",
+    contact: "Drew, dranson@citymarket.coop, 802-861-9700",
+    hours: "",
+    notes: "Door combo 87654. No paper invoice, no check in at receiving. Stock on cart in bread area near hot bar. Check pizza crust numbers.",
+    checkPizza: true, defaultProducts: []
+  },
+  cityMarketSE: {
+    id: "cityMarketSE", name: "City Market, South End", shortName: "City Mkt SE",
+    address: "207 Flynn Ave, Burlington",
+    contact: "Justin, jmallabar@citymarket.coop, 802-540-6400",
+    hours: "",
+    notes: "Door combo 87654. No paper invoice, no check in at receiving. Stock on shelves in bread section with our tags. Check pizza crust numbers.",
+    checkPizza: true, defaultProducts: []
+  },
+  breadButter: {
+    id: "breadButter", name: "Bread and Butter Farm", shortName: "Bread & Butter",
+    address: "200 Leduc Farm Rd, Shelburne",
+    contact: "Ella, sales@breadandbutterfarm.com",
+    hours: "",
+    notes: "Just drop inside the farmstore.",
+    checkPizza: false, defaultProducts: []
+  },
+  oldBrick: {
+    id: "oldBrick", name: "Old Brick Store", shortName: "Old Brick",
+    address: "290 Ferry Road, Charlotte",
+    contact: "Jolene, newoldbs@gmail.com, 802-425-2421",
+    hours: "⚠️ THURSDAYS ONLY",
+    notes: "Front door delivery.",
+    checkPizza: false, defaultProducts: []
+  },
+  middlebury: {
+    id: "middlebury", name: "Middlebury Coop", shortName: "Middlebury",
+    address: "9 Washington St, Middlebury",
+    contact: "Jonny, jonnyjohnson@middlebury.coop, 802-388-7276",
+    hours: "",
+    notes: "Receiving door around back. Through receiving to deli dept, ask someone to check you in. Wooden bread shelf between receiving and deli. Check pizza crust numbers.",
+    checkPizza: true, defaultProducts: []
+  },
+};
+
+const DEFAULT_OPS = [
+  { id: "gas", text: "Fill gas before returning if less than half full", checked: false },
+  { id: "wheels", text: "Bring wheels for trays", checked: false },
+];
+
+const DEFAULT_ROUTES = [
+  { id: "route-1", name: "Montpelier / North", stopIds: ["hmc", "roots", "leo", "jericho", "stonesThrow", "healthyWilliston"] },
+  { id: "route-2", name: "NH / East", stopIds: ["hmc", "lebanon", "hanover", "umplebys", "mehurons"] },
+];
+
+const ALL_PRODUCTS = [
+  { name: "Sourdough", rate: 12.00 },
+  { name: "Buckwheat Sourdough", rate: 12.00 },
+  { name: "Buckwheat Boule", rate: 10.00 },
+  { name: "Olive Rosemary Boule", rate: 12.50 },
+  { name: "Country Loaf", rate: 14.00 },
+  { name: "Harvest Boule", rate: 13.00 },
+  { name: "Sourdough Pizza Crust", rate: 12.00 },
+];
+
+const KNOWN_CODES = {
+  "Farmers To You Keypad": "4829",
+  "City Market Door": "87654",
+  "Leo & Co Back Door": "23790",
+  "Stone's Throw Key Code": "1418",
+};
+
+// ─── STORAGE (localStorage for PWA) ───
+const STORAGE_KEY = "bonte-delivery-data";
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function saveData(data) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (e) { console.error("Save failed:", e); }
+}
+
+// ─── MAIN APP ───
+function BonteDelivery() {
+  const [screen, setScreen] = useState("home");
+  const [routes, setRoutes] = useState(DEFAULT_ROUTES);
+  const [activeRouteId, setActiveRouteId] = useState(null);
+  const [dayData, setDayData] = useState(null);
+  const [viewMode, setViewMode] = useState("delivery");
+  const [expandedStop, setExpandedStop] = useState(null);
+  const [standardOps, setStandardOps] = useState(DEFAULT_OPS);
+  const [customStops, setCustomStops] = useState({});
+  const [showCodes, setShowCodes] = useState(false);
+  const [showAddProduct, setShowAddProduct] = useState(null);
+  const [showAddReturn, setShowAddReturn] = useState(null);
+  const [showAddStop, setShowAddStop] = useState(false);
+  const [showAddOp, setShowAddOp] = useState(false);
+  const [newOpText, setNewOpText] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [csvCopied, setCsvCopied] = useState(false);
+  const [txtCopied, setTxtCopied] = useState(false);
+
+  // Load saved data
+  useEffect(() => {
+    const saved = loadData();
+    if (saved) {
+      if (saved.routes) setRoutes(saved.routes);
+      if (saved.standardOps) setStandardOps(saved.standardOps);
+      if (saved.customStops) setCustomStops(saved.customStops);
+      if (saved.dayData) setDayData(saved.dayData);
+      if (saved.activeRouteId) setActiveRouteId(saved.activeRouteId);
+    }
+    setLoaded(true);
+  }, []);
+
+  // Auto-save
+  useEffect(() => {
+    if (!loaded) return;
+    const t = setTimeout(() => {
+      saveData({ routes, standardOps, customStops, dayData, activeRouteId });
+    }, 500);
+    return () => clearTimeout(t);
+  }, [routes, standardOps, customStops, dayData, activeRouteId, loaded]);
+
+  const allStops = { ...MASTER_STOPS, ...customStops };
+
+  function startDay(routeId) {
+    const route = routes.find(r => r.id === routeId);
+    if (!route) return;
+    setActiveRouteId(routeId);
+    const stops = route.stopIds.map((sid, i) => {
+      const master = allStops[sid];
+      const products = (master?.defaultProducts || []).map((p, j) => ({
+        ...p, id: `${sid}-${j}`, originalQty: p.qty, delivered: false
+      }));
+      return {
+        stopId: sid, order: i + 1, products,
+        pizzaCount: "", returns: [], dailyNotes: "",
+        delivered: false,
+      };
+    });
+    setDayData({ date: new Date().toLocaleDateString(), stops });
+    setScreen("route");
+  }
+
+  function updateStop(stopId, updates) {
+    setDayData(prev => ({
+      ...prev,
+      stops: prev.stops.map(s => s.stopId === stopId ? { ...s, ...updates } : s)
+    }));
+  }
+
+  function updateProduct(stopId, productIdx, updates) {
+    setDayData(prev => ({
+      ...prev,
+      stops: prev.stops.map(s => {
+        if (s.stopId !== stopId) return s;
+        const products = s.products.map((p, i) => i === productIdx ? { ...p, ...updates } : p);
+        return { ...s, products };
+      })
+    }));
+  }
+
+  function addProduct(stopId, product) {
+    setDayData(prev => ({
+      ...prev,
+      stops: prev.stops.map(s => {
+        if (s.stopId !== stopId) return s;
+        return { ...s, products: [...s.products, { ...product, id: `${stopId}-${s.products.length}`, originalQty: product.qty, delivered: false }] };
+      })
+    }));
+  }
+
+  function addReturn(stopId, ret) {
+    setDayData(prev => ({
+      ...prev,
+      stops: prev.stops.map(s => {
+        if (s.stopId !== stopId) return s;
+        return { ...s, returns: [...s.returns, { ...ret, id: Date.now() }] };
+      })
+    }));
+  }
+
+  function removeReturn(stopId, retId) {
+    setDayData(prev => ({
+      ...prev,
+      stops: prev.stops.map(s => {
+        if (s.stopId !== stopId) return s;
+        return { ...s, returns: s.returns.filter(r => r.id !== retId) };
+      })
+    }));
+  }
+
+  function moveStop(fromIdx, dir) {
+    const toIdx = fromIdx + dir;
+    setDayData(prev => {
+      const stops = [...prev.stops];
+      if (toIdx < 0 || toIdx >= stops.length) return prev;
+      [stops[fromIdx], stops[toIdx]] = [stops[toIdx], stops[fromIdx]];
+      return { ...prev, stops: stops.map((s, i) => ({ ...s, order: i + 1 })) };
+    });
+  }
+
+  function generateSummary() {
+    if (!dayData) return "";
+    let s = `BONTÉ DELIVERY SUMMARY\n${dayData.date}\n${"─".repeat(30)}\n\n`;
+    dayData.stops.forEach(stop => {
+      const info = allStops[stop.stopId] || {};
+      s += `■ ${info.name || stop.stopId}\n`;
+      if (stop.products.length > 0) {
+        const adjusted = stop.products.filter(p => p.originalQty > 0 && p.qty !== p.originalQty);
+        const total = stop.products.reduce((sum, p) => sum + (p.qty * p.rate), 0);
+        stop.products.forEach(p => {
+          let line = `  ${p.name}: ${p.qty} × $${p.rate.toFixed(2)} = $${(p.qty * p.rate).toFixed(2)}`;
+          if (p.originalQty > 0 && p.qty !== p.originalQty) line += ` ⚠️ (was ${p.originalQty})`;
+          s += line + "\n";
+        });
+        s += `  TOTAL: $${total.toFixed(2)}`;
+        if (adjusted.length > 0) s += ` (${adjusted.length} adjustment${adjusted.length > 1 ? "s" : ""})`;
+        s += "\n";
+      }
+      if (stop.pizzaCount !== "" && stop.pizzaCount !== null) s += `  🍕 Pizza count: ${stop.pizzaCount}\n`;
+      if (stop.returns.length > 0) {
+        s += `  ↩️ Returns:\n`;
+        stop.returns.forEach(r => { s += `    ${r.qty} × ${r.product}\n`; });
+      }
+      if (stop.dailyNotes) s += `  📝 ${stop.dailyNotes}\n`;
+      s += `  ${stop.delivered ? "✅ Delivered" : "⬜ Not delivered"}\n\n`;
+    });
+    const opsChecked = standardOps.filter(o => o.checked).length;
+    s += `OPS: ${opsChecked}/${standardOps.length} complete\n`;
+    standardOps.forEach(o => { s += `  ${o.checked ? "✅" : "⬜"} ${o.text}\n`; });
+    return s;
+  }
+
+  function generateCSV() {
+    if (!dayData) return "";
+    const rows = [];
+    rows.push(["Bonté Delivery Report", dayData.date].join(","));
+    rows.push("");
+    rows.push("DELIVERIES");
+    rows.push(["Stop","Product","Ordered","Delivered","Adjusted","Unit Price","Line Total","Status"].join(","));
+    dayData.stops.forEach(stop => {
+      const info = allStops[stop.stopId] || {};
+      if (stop.products.length > 0) {
+        stop.products.forEach(p => {
+          const adj = p.originalQty > 0 && p.qty !== p.originalQty ? "YES" : "";
+          rows.push([
+            `"${info.name || stop.stopId}"`, `"${p.name}"`, p.originalQty, p.qty, adj,
+            `$${p.rate.toFixed(2)}`, `$${(p.qty * p.rate).toFixed(2)}`, stop.delivered ? "Delivered" : "Pending"
+          ].join(","));
+        });
+        const total = stop.products.reduce((s, p) => s + (p.qty * p.rate), 0);
+        rows.push([`"${info.name || stop.stopId}"`, "TOTAL", "", "", "", "", `$${total.toFixed(2)}`, ""].join(","));
+      } else {
+        rows.push([`"${info.name || stop.stopId}"`, "No products loaded", "", "", "", "", "", stop.delivered ? "Delivered" : "Pending"].join(","));
+      }
+    });
+    rows.push("");
+    rows.push("RETURNS");
+    rows.push(["Stop","Product","Quantity"].join(","));
+    let hasReturns = false;
+    dayData.stops.forEach(stop => {
+      const info = allStops[stop.stopId] || {};
+      stop.returns.forEach(r => {
+        hasReturns = true;
+        rows.push([`"${info.name || stop.stopId}"`, `"${r.product}"`, r.qty].join(","));
+      });
+    });
+    if (!hasReturns) rows.push(",No returns,");
+    rows.push("");
+    rows.push("PIZZA CRUST COUNTS");
+    rows.push(["Stop","Count"].join(","));
+    dayData.stops.forEach(stop => {
+      const info = allStops[stop.stopId] || {};
+      if (info.checkPizza) {
+        rows.push([`"${info.name || stop.stopId}"`, stop.pizzaCount || "Not counted"].join(","));
+      }
+    });
+    const stopsWithNotes = dayData.stops.filter(s => s.dailyNotes);
+    if (stopsWithNotes.length > 0) {
+      rows.push("");
+      rows.push("NOTES");
+      rows.push(["Stop","Note"].join(","));
+      stopsWithNotes.forEach(stop => {
+        const info = allStops[stop.stopId] || {};
+        rows.push([`"${info.name || stop.stopId}"`, `"${stop.dailyNotes.replace(/"/g, '""')}"`].join(","));
+      });
+    }
+    return rows.join("\n");
+  }
+
+  function downloadCSV() {
+    const csv = generateCSV();
+    // Try file download first
+    try {
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      // Try native share (mobile)
+      if (navigator.share && navigator.canShare) {
+        const file = new File([blob], `bonte-${dayData.date.replace(/\//g, "-")}.csv`, { type: "text/csv" });
+        if (navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file], title: "Bonté Delivery Report" }).catch(() => fallbackCopy(csv));
+          return;
+        }
+      }
+      // Try direct download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `bonte-${dayData.date.replace(/\//g, "-")}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setCsvCopied(true);
+      setTimeout(() => setCsvCopied(false), 2000);
+    } catch {
+      fallbackCopy(csv);
+    }
+  }
+
+  function fallbackCopy(text) {
+    navigator.clipboard?.writeText(text);
+    setCsvCopied(true);
+    setTimeout(() => setCsvCopied(false), 2000);
+  }
+
+  // ─── STYLES ───
+  const colors = {
+    bg: "#1A1612", surface: "#252019", surfaceLight: "#302A23",
+    border: "#3D352C", primary: "#D4915C", primaryDim: "#A06A3C",
+    success: "#5B8A5B", successDim: "#3D6B3D",
+    danger: "#C45C5C", dangerDim: "#8B3E3E",
+    text: "#E8DDD0", textDim: "#9B8E80", textMuted: "#6B5F53",
+    accent: "#7BA7C2",
+  };
+
+  const baseBtn = {
+    border: "none", borderRadius: 10, cursor: "pointer",
+    fontFamily: "'DM Sans', sans-serif", fontWeight: 600,
+    transition: "all 0.15s ease", minHeight: 44,
+  };
+
+  if (!loaded) return (
+    <div style={{ background: colors.bg, color: colors.text, height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif" }}>
+      <p style={{ opacity: 0.6 }}>Loading...</p>
+    </div>
+  );
+
+  // ─── HOME SCREEN ───
+  if (screen === "home") return (
+    <div style={{ background: colors.bg, minHeight: "100vh", color: colors.text, fontFamily: "'DM Sans', sans-serif", padding: "0 0 100px 0" }}>
+      <div style={{ padding: "28px 20px 20px", borderBottom: `1px solid ${colors.border}` }}>
+        <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 30, margin: 0, color: colors.primary }}>Bonté Delivery</h1>
+        <p style={{ color: colors.textDim, fontSize: 15, margin: "6px 0 0" }}>Select a route to start your day</p>
+      </div>
+
+      <div style={{ padding: "16px 20px" }}>
+        <h2 style={{ fontSize: 14, color: colors.textDim, textTransform: "uppercase", letterSpacing: 1, margin: "0 0 12px" }}>Routes</h2>
+        {routes.map(route => (
+          <div key={route.id} style={{ background: colors.surface, borderRadius: 14, padding: "20px", marginBottom: 12, border: `1px solid ${colors.border}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 19 }}>{route.name}</div>
+                <div style={{ color: colors.textDim, fontSize: 14, marginTop: 4 }}>{route.stopIds.length} stops</div>
+              </div>
+              <button onClick={() => startDay(route.id)} style={{ ...baseBtn, background: colors.primary, color: "#1A1612", padding: "12px 24px", fontSize: 16 }}>
+                Start
+              </button>
+            </div>
+            <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {route.stopIds.map(sid => (
+                <span key={sid} style={{ background: colors.surfaceLight, color: colors.textDim, fontSize: 12, padding: "4px 10px", borderRadius: 6 }}>
+                  {allStops[sid]?.shortName || sid}
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {dayData && (
+        <div style={{ padding: "0 20px 16px" }}>
+          <button onClick={() => setScreen("route")} style={{ ...baseBtn, background: colors.successDim, color: colors.text, padding: "14px", width: "100%", fontSize: 15, border: `1px solid ${colors.success}` }}>
+            ↩ Resume Today's Run ({dayData.date})
+          </button>
+        </div>
+      )}
+
+      <div style={{ padding: "0 20px" }}>
+        <h2 style={{ fontSize: 14, color: colors.textDim, textTransform: "uppercase", letterSpacing: 1, margin: "16px 0 12px" }}>Standard Ops</h2>
+        {standardOps.map((op, i) => (
+          <div key={op.id} onClick={() => {
+            setStandardOps(prev => prev.map((o, j) => j === i ? { ...o, checked: !o.checked } : o));
+          }} style={{ background: colors.surface, borderRadius: 12, padding: "16px 18px", marginBottom: 8, display: "flex", alignItems: "center", gap: 14, cursor: "pointer", border: `1px solid ${op.checked ? colors.success : colors.border}` }}>
+            <span style={{ fontSize: 22 }}>{op.checked ? "✅" : "⬜"}</span>
+            <span style={{ fontSize: 15, color: op.checked ? colors.textDim : colors.text, textDecoration: op.checked ? "line-through" : "none" }}>{op.text}</span>
+          </div>
+        ))}
+        {showAddOp ? (
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <input value={newOpText} onChange={e => setNewOpText(e.target.value)} placeholder="New ops item..."
+              style={{ flex: 1, background: colors.surfaceLight, border: `1px solid ${colors.border}`, borderRadius: 8, padding: "10px 12px", color: colors.text, fontSize: 14 }} />
+            <button onClick={() => {
+              if (newOpText.trim()) {
+                setStandardOps(prev => [...prev, { id: `op-${Date.now()}`, text: newOpText.trim(), checked: false }]);
+                setNewOpText(""); setShowAddOp(false);
+              }
+            }} style={{ ...baseBtn, background: colors.primary, color: "#1A1612", padding: "10px 14px", fontSize: 13 }}>Add</button>
+            <button onClick={() => { setShowAddOp(false); setNewOpText(""); }} style={{ ...baseBtn, background: colors.surfaceLight, color: colors.textDim, padding: "10px 14px", fontSize: 13 }}>✕</button>
+          </div>
+        ) : (
+          <button onClick={() => setShowAddOp(true)} style={{ ...baseBtn, background: "transparent", color: colors.textMuted, padding: "10px 0", fontSize: 13, border: "none" }}>+ Add ops item</button>
+        )}
+      </div>
+
+      <div style={{ padding: "16px 20px" }}>
+        <button onClick={() => setShowCodes(!showCodes)} style={{ ...baseBtn, background: colors.surface, color: colors.textDim, padding: "12px 16px", width: "100%", fontSize: 13, border: `1px solid ${colors.border}`, textAlign: "left" }}>
+          🔑 Quick Codes {showCodes ? "▲" : "▼"}
+        </button>
+        {showCodes && (
+          <div style={{ background: colors.surface, borderRadius: "0 0 10px 10px", padding: "8px 16px", borderTop: "none" }}>
+            {Object.entries(KNOWN_CODES).map(([label, code]) => (
+              <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${colors.border}`, fontSize: 14 }}>
+                <span style={{ color: colors.textDim }}>{label}</span>
+                <span style={{ fontFamily: "monospace", color: colors.primary, fontWeight: 700, letterSpacing: 2 }}>{code}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // ─── ROUTE VIEW ───
+  if (screen === "route" && dayData) {
+    const displayStops = viewMode === "load" ? [...dayData.stops].reverse() : dayData.stops;
+    const deliveredCount = dayData.stops.filter(s => s.delivered).length;
+
+    return (
+      <div style={{ background: colors.bg, minHeight: "100vh", color: colors.text, fontFamily: "'DM Sans', sans-serif", paddingBottom: 80 }}>
+        <div style={{ padding: "20px 20px", borderBottom: `1px solid ${colors.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <button onClick={() => setScreen("home")} style={{ ...baseBtn, background: "transparent", color: colors.textDim, padding: 0, fontSize: 14, marginBottom: 6, minHeight: "auto" }}>← Home</button>
+            <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 24, margin: 0, color: colors.primary }}>
+              {routes.find(r => r.id === activeRouteId)?.name || "Today's Run"}
+            </h1>
+            <p style={{ color: colors.textDim, fontSize: 14, margin: "4px 0 0" }}>{dayData.date} · {deliveredCount}/{dayData.stops.length} delivered</p>
+          </div>
+          <button onClick={() => setScreen("summary")} style={{ ...baseBtn, background: colors.surface, color: colors.accent, padding: "8px 14px", fontSize: 13, border: `1px solid ${colors.border}` }}>
+            Summary
+          </button>
+        </div>
+
+        <div style={{ display: "flex", margin: "16px 20px", background: colors.surface, borderRadius: 12, overflow: "hidden", border: `1px solid ${colors.border}` }}>
+          {[["delivery", "🚛 Delivery Order"], ["load", "📦 Load Order"]].map(([mode, label]) => (
+            <button key={mode} onClick={() => setViewMode(mode)}
+              style={{ ...baseBtn, flex: 1, padding: "14px", fontSize: 15, borderRadius: 0,
+                background: viewMode === mode ? colors.primary : "transparent",
+                color: viewMode === mode ? "#1A1612" : colors.textDim }}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {viewMode === "load" && (
+          <p style={{ color: colors.accent, fontSize: 13, textAlign: "center", margin: "0 0 12px", fontStyle: "italic" }}>
+            ↑ First item goes in the back of the van
+          </p>
+        )}
+
+        <div style={{ padding: "0 14px" }}>
+          {displayStops.map((stop, idx) => {
+            const info = allStops[stop.stopId] || {};
+            const isExpanded = expandedStop === stop.stopId;
+            const total = stop.products.reduce((sum, p) => sum + (p.qty * p.rate), 0);
+            const hasAdjustments = stop.products.some(p => p.originalQty > 0 && p.qty !== p.originalQty);
+            const routeNote = info.routeNotes?.[activeRouteId];
+            const realIdx = dayData.stops.findIndex(s => s.stopId === stop.stopId);
+
+            return (
+              <div key={stop.stopId} style={{ background: colors.surface, borderRadius: 14, marginBottom: 10, border: `1px solid ${stop.delivered ? colors.success : colors.border}`, overflow: "hidden" }}>
+                <div onClick={() => setExpandedStop(isExpanded ? null : stop.stopId)}
+                  style={{ padding: "18px 18px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 14, color: colors.textMuted, fontWeight: 700, minWidth: 24 }}>
+                      {viewMode === "load" ? `L${idx + 1}` : `${stop.order}`}
+                    </span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: 17, color: stop.delivered ? colors.success : colors.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {stop.delivered && "✓ "}{info.name || stop.stopId}
+                      </div>
+                      <div style={{ fontSize: 14, color: colors.textDim, marginTop: 3 }}>
+                        {info.checkPizza && "🍕 "}{stop.returns.length > 0 && "↩️ "}{hasAdjustments && "⚠️ "}
+                        {stop.products.length > 0 && `$${total.toFixed(2)}`}
+                      </div>
+                    </div>
+                  </div>
+                  <span style={{ color: colors.textMuted, fontSize: 18 }}>{isExpanded ? "▲" : "▼"}</span>
+                </div>
+
+                {isExpanded && (
+                  <div style={{ borderTop: `1px solid ${colors.border}`, padding: "16px 18px" }}>
+                    <div style={{ marginBottom: 16 }}>
+                      <a href={`https://maps.google.com/maps?q=${encodeURIComponent(info.address)}`} target="_blank" rel="noopener noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        style={{ fontSize: 15, color: colors.accent, marginBottom: 6, display: "block", textDecoration: "none", borderBottom: `1px dashed ${colors.accent}40`, paddingBottom: 4 }}>
+                        📍 {info.address} ↗
+                      </a>
+                      {info.contact && <div style={{ fontSize: 14, color: colors.textDim, marginBottom: 6 }}>👤 {info.contact}</div>}
+                      {info.hours && <div style={{ fontSize: 14, color: colors.textDim, marginBottom: 6 }}>🕐 {info.hours}</div>}
+                      <div style={{ fontSize: 14, color: colors.textDim, background: colors.surfaceLight, padding: "12px 14px", borderRadius: 8, lineHeight: 1.5, marginTop: 6 }}>
+                        {info.notes}
+                      </div>
+                      {routeNote && (
+                        <div style={{ fontSize: 14, color: colors.primary, background: `${colors.primary}15`, padding: "12px 14px", borderRadius: 8, marginTop: 6, fontWeight: 600, lineHeight: 1.5 }}>
+                          ⚠️ {routeNote}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                      <button disabled={realIdx === 0} onClick={(e) => { e.stopPropagation(); moveStop(realIdx, -1); }}
+                        style={{ ...baseBtn, background: colors.surfaceLight, color: realIdx === 0 ? colors.textMuted : colors.text, padding: "8px 14px", fontSize: 13, opacity: realIdx === 0 ? 0.4 : 1 }}>▲ Up</button>
+                      <button disabled={realIdx === dayData.stops.length - 1} onClick={(e) => { e.stopPropagation(); moveStop(realIdx, 1); }}
+                        style={{ ...baseBtn, background: colors.surfaceLight, color: realIdx === dayData.stops.length - 1 ? colors.textMuted : colors.text, padding: "8px 14px", fontSize: 13, opacity: realIdx === dayData.stops.length - 1 ? 0.4 : 1 }}>▼ Down</button>
+                      <button onClick={(e) => { e.stopPropagation(); if(confirm(`Remove ${info.name || stop.stopId} from today's route?`)) { setExpandedStop(null); setDayData(prev => ({ ...prev, stops: prev.stops.filter(s => s.stopId !== stop.stopId).map((s, i) => ({ ...s, order: i + 1 })) })); } }}
+                        style={{ ...baseBtn, background: "transparent", color: colors.danger, padding: "8px 14px", fontSize: 13, marginLeft: "auto" }}>✕ Remove</button>
+                    </div>
+
+                    <div style={{ marginBottom: 16 }}>
+                      <h3 style={{ fontSize: 14, color: colors.textDim, textTransform: "uppercase", letterSpacing: 0.5, margin: "0 0 10px" }}>Invoice Items</h3>
+                      {stop.products.length === 0 && <p style={{ fontSize: 15, color: colors.textMuted, fontStyle: "italic" }}>No products loaded yet</p>}
+                      {stop.products.map((p, pi) => {
+                        const adjusted = p.originalQty > 0 && p.qty !== p.originalQty;
+                        return (
+                          <div key={pi} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0", borderBottom: `1px solid ${colors.border}` }}>
+                            <button onClick={() => updateProduct(stop.stopId, pi, { delivered: !p.delivered })}
+                              style={{ ...baseBtn, background: "transparent", padding: 0, fontSize: 22, color: p.delivered ? colors.success : colors.textMuted, minWidth: 32, minHeight: "auto" }}>
+                              {p.delivered ? "✅" : "⬜"}
+                            </button>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 16, color: colors.text }}>{p.name}</div>
+                              {adjusted && <div style={{ fontSize: 13, color: colors.danger, marginTop: 2 }}>was {p.originalQty}</div>}
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <button onClick={() => updateProduct(stop.stopId, pi, { qty: Math.max(0, p.qty - 1) })}
+                                style={{ ...baseBtn, background: colors.surfaceLight, color: colors.text, width: 36, height: 36, padding: 0, fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
+                              <span style={{ fontFamily: "monospace", fontSize: 18, fontWeight: 700, minWidth: 24, textAlign: "center", color: adjusted ? colors.danger : colors.text }}>{p.qty}</span>
+                              <button onClick={() => updateProduct(stop.stopId, pi, { qty: p.qty + 1 })}
+                                style={{ ...baseBtn, background: colors.surfaceLight, color: colors.text, width: 36, height: 36, padding: 0, fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+                            </div>
+                            <div style={{ fontFamily: "monospace", fontSize: 15, color: colors.textDim, minWidth: 60, textAlign: "right" }}>
+                              ${(p.qty * p.rate).toFixed(2)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {stop.products.length > 0 && (
+                        <div style={{ display: "flex", justifyContent: "space-between", padding: "14px 0 6px", fontWeight: 700 }}>
+                          <span style={{ fontSize: 16 }}>Total</span>
+                          <span style={{ fontFamily: "monospace", fontSize: 18, color: hasAdjustments ? colors.danger : colors.primary }}>
+                            ${total.toFixed(2)} {hasAdjustments && "⚠️"}
+                          </span>
+                        </div>
+                      )}
+                      {showAddProduct === stop.stopId ? (
+                        <AddProductForm onAdd={(p) => { addProduct(stop.stopId, p); setShowAddProduct(null); }} onCancel={() => setShowAddProduct(null)} colors={colors} baseBtn={baseBtn} />
+                      ) : (
+                        <button onClick={() => setShowAddProduct(stop.stopId)} style={{ ...baseBtn, background: "transparent", color: colors.textMuted, padding: "10px 0", fontSize: 14, border: "none", minHeight: "auto" }}>+ Add product</button>
+                      )}
+                    </div>
+
+                    {info.checkPizza && (
+                      <div style={{ marginBottom: 16, background: colors.surfaceLight, borderRadius: 10, padding: "16px" }}>
+                        <label style={{ fontSize: 15, color: colors.textDim, display: "block", marginBottom: 8 }}>🍕 Pizza Crust Count</label>
+                        <input type="number" inputMode="numeric" value={stop.pizzaCount} onChange={e => updateStop(stop.stopId, { pizzaCount: e.target.value })}
+                          placeholder="0" style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: "12px 14px", color: colors.text, fontSize: 24, fontFamily: "monospace", fontWeight: 700, width: 90, textAlign: "center" }} />
+                      </div>
+                    )}
+
+                    <div style={{ marginBottom: 16 }}>
+                      <h3 style={{ fontSize: 14, color: colors.textDim, textTransform: "uppercase", letterSpacing: 0.5, margin: "0 0 10px" }}>↩️ Bread Returns</h3>
+                      {stop.returns.length === 0 && <p style={{ fontSize: 15, color: colors.textMuted, fontStyle: "italic" }}>No returns</p>}
+                      {stop.returns.map(r => (
+                        <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${colors.border}` }}>
+                          <span style={{ fontSize: 16 }}>{r.qty} × {r.product}</span>
+                          <button onClick={() => removeReturn(stop.stopId, r.id)} style={{ ...baseBtn, background: "transparent", color: colors.danger, fontSize: 20, padding: "4px 8px", minHeight: "auto" }}>×</button>
+                        </div>
+                      ))}
+                      {showAddReturn === stop.stopId ? (
+                        <AddReturnForm onAdd={(r) => { addReturn(stop.stopId, r); setShowAddReturn(null); }} onCancel={() => setShowAddReturn(null)} colors={colors} baseBtn={baseBtn} stopProducts={stop.products} />
+                      ) : (
+                        <button onClick={() => setShowAddReturn(stop.stopId)} style={{ ...baseBtn, background: "transparent", color: colors.textMuted, padding: "10px 0", fontSize: 14, border: "none", minHeight: "auto" }}>+ Add return</button>
+                      )}
+                    </div>
+
+                    <div style={{ marginBottom: 16 }}>
+                      <h3 style={{ fontSize: 14, color: colors.textDim, textTransform: "uppercase", letterSpacing: 0.5, margin: "0 0 10px" }}>📝 Notes for Today</h3>
+                      <textarea value={stop.dailyNotes} onChange={e => updateStop(stop.stopId, { dailyNotes: e.target.value })}
+                        placeholder="e.g., Ask Mark about invoice..."
+                        style={{ background: colors.surfaceLight, border: `1px solid ${colors.border}`, borderRadius: 10, padding: "14px", color: colors.text, fontSize: 15, fontFamily: "'DM Sans', sans-serif", width: "100%", minHeight: 70, resize: "vertical", boxSizing: "border-box", lineHeight: 1.5 }} />
+                    </div>
+
+                    <button onClick={() => updateStop(stop.stopId, { delivered: !stop.delivered })}
+                      style={{ ...baseBtn, width: "100%", padding: "16px", fontSize: 17,
+                        background: stop.delivered ? colors.surfaceLight : colors.success,
+                        color: stop.delivered ? colors.textDim : "#fff",
+                        border: `1px solid ${stop.delivered ? colors.border : colors.success}` }}>
+                      {stop.delivered ? "↩ Mark as Not Delivered" : "✓ Mark as Delivered"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Add Stop */}
+        <div style={{ padding: "10px 14px 0" }}>
+          {showAddStop ? (
+            <div style={{ background: colors.surface, borderRadius: 14, padding: "18px", border: `1px solid ${colors.border}` }}>
+              <h3 style={{ fontSize: 14, color: colors.textDim, textTransform: "uppercase", letterSpacing: 0.5, margin: "0 0 12px" }}>Add Stop to Route</h3>
+              {(() => {
+                const currentIds = dayData.stops.map(s => s.stopId);
+                const available = Object.values(allStops).filter(s => !currentIds.includes(s.id));
+                return (
+                  <>
+                    {available.length > 0 && (
+                      <div style={{ maxHeight: 240, overflowY: "auto", marginBottom: 12 }}>
+                        {available.map(s => (
+                          <button key={s.id} onClick={() => {
+                            const newStop = {
+                              stopId: s.id, order: dayData.stops.length + 1,
+                              products: (s.defaultProducts || []).map((p, j) => ({ ...p, id: `${s.id}-${j}`, originalQty: p.qty, delivered: false })),
+                              pizzaCount: "", returns: [], dailyNotes: "", delivered: false,
+                            };
+                            setDayData(prev => ({ ...prev, stops: [...prev.stops, newStop] }));
+                            setShowAddStop(false);
+                          }} style={{ ...baseBtn, background: colors.surfaceLight, color: colors.text, padding: "14px 14px", width: "100%", textAlign: "left", marginBottom: 6, fontSize: 15, border: `1px solid ${colors.border}`, borderRadius: 10, display: "block" }}>
+                            <div style={{ fontWeight: 600 }}>{s.name}</div>
+                            <div style={{ fontSize: 13, color: colors.textDim, marginTop: 3 }}>{s.address}</div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <AddCustomStopForm onAdd={(ns) => {
+                      const id = `custom-${Date.now()}`;
+                      const stopData = { id, name: ns.name, shortName: ns.name, address: ns.address, contact: ns.contact || "", hours: "", notes: ns.notes || "", checkPizza: false, defaultProducts: [] };
+                      setCustomStops(prev => ({ ...prev, [id]: stopData }));
+                      const dayStop = { stopId: id, order: dayData.stops.length + 1, products: [], pizzaCount: "", returns: [], dailyNotes: "", delivered: false };
+                      setDayData(prev => ({ ...prev, stops: [...prev.stops, dayStop] }));
+                      setShowAddStop(false);
+                    }} onCancel={() => setShowAddStop(false)} colors={colors} baseBtn={baseBtn} />
+                  </>
+                );
+              })()}
+            </div>
+          ) : (
+            <button onClick={() => setShowAddStop(true)}
+              style={{ ...baseBtn, background: colors.surface, color: colors.textDim, padding: "16px", width: "100%", fontSize: 15, border: `1px dashed ${colors.border}`, borderRadius: 14 }}>
+              + Add Stop to Route
+            </button>
+          )}
+        </div>
+
+        {/* Standard Ops */}
+        <div style={{ padding: "16px 14px" }}>
+          <div style={{ background: colors.surface, borderRadius: 14, padding: "16px 18px", border: `1px solid ${colors.border}` }}>
+            <h3 style={{ fontSize: 14, color: colors.textDim, textTransform: "uppercase", letterSpacing: 0.5, margin: "0 0 10px" }}>⚙️ Standard Ops</h3>
+            {standardOps.map((op, i) => (
+              <div key={op.id} onClick={() => setStandardOps(prev => prev.map((o, j) => j === i ? { ...o, checked: !o.checked } : o))}
+                style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", cursor: "pointer", borderBottom: i < standardOps.length - 1 ? `1px solid ${colors.border}` : "none" }}>
+                <span style={{ fontSize: 22 }}>{op.checked ? "✅" : "⬜"}</span>
+                <span style={{ fontSize: 15, color: op.checked ? colors.textMuted : colors.text, textDecoration: op.checked ? "line-through" : "none" }}>{op.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── SUMMARY SCREEN ───
+  if (screen === "summary" && dayData) {
+    const summary = generateSummary();
+    return (
+      <div style={{ background: colors.bg, minHeight: "100vh", color: colors.text, fontFamily: "'DM Sans', sans-serif", padding: "0 0 40px" }}>
+        <div style={{ padding: "20px 20px", borderBottom: `1px solid ${colors.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <button onClick={() => setScreen("route")} style={{ ...baseBtn, background: "transparent", color: colors.textDim, padding: 0, fontSize: 14, marginBottom: 6, minHeight: "auto" }}>← Back to Route</button>
+            <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 24, margin: 0, color: colors.primary }}>Day Summary</h1>
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={() => { navigator.clipboard?.writeText(summary); setTxtCopied(true); setTimeout(() => setTxtCopied(false), 2000); }}
+              style={{ ...baseBtn, background: colors.surface, color: colors.text, padding: "10px 14px", fontSize: 13, border: `1px solid ${colors.border}` }}>
+              {txtCopied ? "✓ Copied!" : "📋 Copy"}
+            </button>
+            <button onClick={downloadCSV}
+              style={{ ...baseBtn, background: colors.primary, color: "#1A1612", padding: "10px 14px", fontSize: 13 }}>
+              {csvCopied ? "✓ Done!" : "📊 CSV"}
+            </button>
+          </div>
+        </div>
+        <pre style={{ padding: "20px", fontSize: 14, lineHeight: 1.7, whiteSpace: "pre-wrap", wordBreak: "break-word", color: colors.text, fontFamily: "'DM Sans', monospace" }}>
+          {summary}
+        </pre>
+        <div style={{ padding: "0 20px" }}>
+          <button onClick={() => { if(confirm("End today's run and clear all data?")) { setDayData(null); setScreen("home"); } }}
+            style={{ ...baseBtn, width: "100%", padding: "16px", background: colors.dangerDim, color: colors.text, fontSize: 16, border: `1px solid ${colors.danger}` }}>
+            End Day & Clear
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+// ─── SUB-COMPONENTS ───
+function AddProductForm({ onAdd, onCancel, colors, baseBtn }) {
+  const [selected, setSelected] = useState("");
+  const [rate, setRate] = useState("");
+  const [qty, setQty] = useState("1");
+  const [customMode, setCustomMode] = useState(false);
+  const [customName, setCustomName] = useState("");
+
+  function handleSelect(val) {
+    if (val === "__custom__") {
+      setCustomMode(true);
+      setSelected(val);
+      setRate("");
+    } else {
+      setSelected(val);
+      setCustomMode(false);
+      const product = ALL_PRODUCTS.find(p => p.name === val);
+      if (product) setRate(String(product.rate));
+    }
+  }
+
+  function handleAdd() {
+    const name = customMode ? customName : selected;
+    if (name && rate && qty) onAdd({ name, rate: parseFloat(rate), qty: parseInt(qty) });
+  }
+
+  return (
+    <div style={{ background: colors.surfaceLight, borderRadius: 8, padding: 12, marginTop: 8 }}>
+      <select value={selected} onChange={e => handleSelect(e.target.value)}
+        style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 6, padding: "10px 10px", color: selected ? colors.text : colors.textMuted, fontSize: 14, width: "100%", marginBottom: 8, boxSizing: "border-box" }}>
+        <option value="" disabled>Select product...</option>
+        {ALL_PRODUCTS.map(p => (
+          <option key={p.name} value={p.name}>{p.name} — ${p.rate.toFixed(2)}</option>
+        ))}
+        <option value="__custom__">＋ Custom product...</option>
+      </select>
+      {customMode && (
+        <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+          <input value={customName} onChange={e => setCustomName(e.target.value)} placeholder="Product name"
+            style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 6, padding: "8px 10px", color: colors.text, fontSize: 14, flex: 1 }} />
+          <input type="number" inputMode="decimal" value={rate} onChange={e => setRate(e.target.value)} placeholder="Price"
+            style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 6, padding: "8px 10px", color: colors.text, fontSize: 14, width: 70 }} />
+        </div>
+      )}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+        <span style={{ fontSize: 13, color: colors.textDim }}>Qty:</span>
+        <button onClick={() => setQty(String(Math.max(1, parseInt(qty || "1") - 1)))}
+          style={{ ...baseBtn, background: colors.surface, color: colors.text, width: 36, height: 36, padding: 0, fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
+        <span style={{ fontFamily: "monospace", fontSize: 20, fontWeight: 700, minWidth: 24, textAlign: "center", color: colors.text }}>{qty}</span>
+        <button onClick={() => setQty(String(parseInt(qty || "1") + 1))}
+          style={{ ...baseBtn, background: colors.surface, color: colors.text, width: 36, height: 36, padding: 0, fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+        {selected && !customMode && <span style={{ fontSize: 13, color: colors.textDim, fontFamily: "monospace" }}>${(parseFloat(rate || 0) * parseInt(qty || 0)).toFixed(2)}</span>}
+      </div>
+      <div style={{ display: "flex", gap: 6 }}>
+        <button onClick={handleAdd}
+          style={{ ...baseBtn, background: colors.primary, color: "#1A1612", padding: "10px 14px", fontSize: 13, flex: 1 }}>Add Product</button>
+        <button onClick={onCancel} style={{ ...baseBtn, background: colors.surface, color: colors.textDim, padding: "10px 14px", fontSize: 13 }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function AddReturnForm({ onAdd, onCancel, colors, baseBtn, stopProducts }) {
+  const productNames = [...new Set([
+    ...(stopProducts || []).map(p => p.name),
+    ...ALL_PRODUCTS.map(p => p.name),
+  ])].sort();
+  const [product, setProduct] = useState("");
+  const [qty, setQty] = useState("1");
+  return (
+    <div style={{ background: colors.surfaceLight, borderRadius: 8, padding: 12, marginTop: 8 }}>
+      <select value={product} onChange={e => setProduct(e.target.value)}
+        style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 6, padding: "10px 10px", color: product ? colors.text : colors.textMuted, fontSize: 14, width: "100%", marginBottom: 8, boxSizing: "border-box" }}>
+        <option value="" disabled>Select product...</option>
+        {productNames.map(name => (
+          <option key={name} value={name}>{name}</option>
+        ))}
+      </select>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+        <span style={{ fontSize: 13, color: colors.textDim }}>Qty:</span>
+        <button onClick={() => setQty(String(Math.max(1, parseInt(qty || "1") - 1)))}
+          style={{ ...baseBtn, background: colors.surface, color: colors.text, width: 36, height: 36, padding: 0, fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
+        <span style={{ fontFamily: "monospace", fontSize: 20, fontWeight: 700, minWidth: 24, textAlign: "center", color: colors.text }}>{qty}</span>
+        <button onClick={() => setQty(String(parseInt(qty || "1") + 1))}
+          style={{ ...baseBtn, background: colors.surface, color: colors.text, width: 36, height: 36, padding: 0, fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+      </div>
+      <div style={{ display: "flex", gap: 6 }}>
+        <button onClick={() => { if (product && qty) onAdd({ product, qty: parseInt(qty) }); }}
+          style={{ ...baseBtn, background: colors.primary, color: "#1A1612", padding: "10px 14px", fontSize: 13, flex: 1 }}>Add Return</button>
+        <button onClick={onCancel} style={{ ...baseBtn, background: colors.surface, color: colors.textDim, padding: "10px 14px", fontSize: 13 }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function AddCustomStopForm({ onAdd, onCancel, colors, baseBtn }) {
+  const [name, setName] = useState("");
+  const [address, setAddress] = useState("");
+  const [contact, setContact] = useState("");
+  const [notes, setNotes] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  if (!showForm) return (
+    <div style={{ display: "flex", gap: 6 }}>
+      <button onClick={() => setShowForm(true)} style={{ ...baseBtn, background: colors.primaryDim, color: colors.text, padding: "10px 14px", fontSize: 13, flex: 1 }}>+ New Custom Stop</button>
+      <button onClick={onCancel} style={{ ...baseBtn, background: colors.surfaceLight, color: colors.textDim, padding: "10px 14px", fontSize: 13 }}>Cancel</button>
+    </div>
+  );
+  return (
+    <div style={{ borderTop: `1px solid ${colors.border}`, paddingTop: 10 }}>
+      <div style={{ fontSize: 12, color: colors.textDim, marginBottom: 6, fontWeight: 600 }}>New Custom Stop</div>
+      <input value={name} onChange={e => setName(e.target.value)} placeholder="Stop name *"
+        style={{ background: colors.surfaceLight, border: `1px solid ${colors.border}`, borderRadius: 6, padding: "8px 10px", color: colors.text, fontSize: 14, width: "100%", marginBottom: 6, boxSizing: "border-box" }} />
+      <input value={address} onChange={e => setAddress(e.target.value)} placeholder="Address *"
+        style={{ background: colors.surfaceLight, border: `1px solid ${colors.border}`, borderRadius: 6, padding: "8px 10px", color: colors.text, fontSize: 14, width: "100%", marginBottom: 6, boxSizing: "border-box" }} />
+      <input value={contact} onChange={e => setContact(e.target.value)} placeholder="Contact (optional)"
+        style={{ background: colors.surfaceLight, border: `1px solid ${colors.border}`, borderRadius: 6, padding: "8px 10px", color: colors.text, fontSize: 14, width: "100%", marginBottom: 6, boxSizing: "border-box" }} />
+      <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Delivery notes (optional)"
+        style={{ background: colors.surfaceLight, border: `1px solid ${colors.border}`, borderRadius: 6, padding: "8px 10px", color: colors.text, fontSize: 14, width: "100%", marginBottom: 8, boxSizing: "border-box" }} />
+      <div style={{ display: "flex", gap: 6 }}>
+        <button onClick={() => { if (name && address) onAdd({ name, address, contact, notes }); }}
+          style={{ ...baseBtn, background: colors.primary, color: "#1A1612", padding: "10px 14px", fontSize: 13, flex: 1 }}>Add Stop</button>
+        <button onClick={onCancel} style={{ ...baseBtn, background: colors.surfaceLight, color: colors.textDim, padding: "10px 14px", fontSize: 13 }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── RENDER ───
+ReactDOM.render(<BonteDelivery />, document.getElementById("root"));
+  </script>
+</body>
+</html>
